@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>PeruFibra Control - Gestión de Técnicos</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; }
+  .tab-active { background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; }
+  .card { transition: all 0.3s; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+  .badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .pulse { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  #map { height: 500px; border-radius: 8px; }
+  .scroll-area { max-height: 500px; overflow-y: auto; }
+  .scroll-area::-webkit-scrollbar { width: 6px; }
+  .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  .tramo-t1 { background: #fef3c7; border-left: 4px solid #f59e0b; }
+  .tramo-t2 { background: #dbeafe; border-left: 4px solid #3b82f6; }
+  .tramo-t3 { background: #fce7f3; border-left: 4px solid #ec4899; }
+  .estado-libre { background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-left: 6px solid #10b981; }
+  .estado-proximo { background: linear-gradient(135deg, #dcfce7, #bbf7d0); border-left: 6px solid #22c55e; }
+  .estado-activo { background: linear-gradient(135deg, #fef3c7, #fde68a); border-left: 6px solid #f59e0b; }
+  .estado-saturado { background: linear-gradient(135deg, #fee2e2, #fecaca); border-left: 6px solid #ef4444; }
+  
+  /* Fuentes más grandes para sección técnicos */
+  #gridTecnicos .card { font-size: 14px; }
+  #gridTecnicos .card .font-bold { font-size: 16px; }
+  #gridTecnicos .card .estado-texto { font-size: 18px !important; font-weight: 800 !important; }
+  #gridTecnicos .card .estado-icono { font-size: 32px !important; }
+  #gridTecnicos .card .carga-numero { font-size: 28px !important; font-weight: 900 !important; }
+  #gridTecnicos .card .sub-label { font-size: 13px !important; }
+  #gridTecnicos .card .tramo-box { font-size: 14px !important; padding: 6px !important; }
+  #gridTecnicos .card .tramo-box .font-bold { font-size: 18px !important; }
+  #gridTecnicos .card .estado-orden { font-size: 13px !important; padding: 6px !important; }
+  #gridTecnicos .card .estado-orden .font-bold { font-size: 16px !important; }
+  #gridTecnicos .card .info-line { font-size: 14px !important; }
+</style>
+</head>
+<body class="bg-slate-100">
+
+<!-- HEADER -->
+<header class="bg-gradient-to-r from-blue-900 to-blue-700 text-white shadow-lg">
+  <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="bg-white text-blue-900 rounded-lg p-2 font-bold text-xl">PF</div>
+      <div>
+        <h1 class="text-xl font-bold">PeruFibra Control</h1>
+        <p class="text-xs text-blue-200">Sistema de Asignación Inteligente por Tramos</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="text-right text-sm">
+        <div id="fechaActual" class="font-semibold"></div>
+        <div id="horaActual" class="text-blue-200 text-xs"></div>
+      </div>
+      <label class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg cursor-pointer font-semibold shadow">
+        📁 Cargar Excel
+        <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
+      </label>
+      <button onclick="actualizarDatos()" class="bg-yellow-500 hover:bg-yellow-600 px-4 py-2 rounded-lg font-semibold shadow">
+        🔄 Actualizar
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="container mx-auto px-4 py-4">
+
+  <!-- KPIs -->
+  <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+    <div class="card bg-white rounded-lg p-3 border-l-4 border-blue-500">
+      <div class="text-xs text-slate-500">TOTAL ÓRDENES</div>
+      <div id="kpiTotal" class="text-2xl font-bold text-blue-700">0</div>
+    </div>
+    <div class="card bg-white rounded-lg p-3 border-l-4 border-green-500">
+      <div class="text-xs text-slate-500">FINALIZADAS</div>
+      <div id="kpiFinalizadas" class="text-2xl font-bold text-green-600">0</div>
+    </div>
+    <div class="card bg-white rounded-lg p-3 border-l-4 border-yellow-500">
+      <div class="text-xs text-slate-500">EN PROCESO</div>
+      <div id="kpiProceso" class="text-2xl font-bold text-yellow-600">0</div>
+    </div>
+    <div class="card bg-white rounded-lg p-3 border-l-4 border-orange-500">
+      <div class="text-xs text-slate-500">PENDIENTES</div>
+      <div id="kpiPendientes" class="text-2xl font-bold text-orange-600">0</div>
+      <div class="text-[9px] text-slate-400 mt-1">Pend. + Prog. + Coord.</div>
+    </div>
+    <div class="card bg-white rounded-lg p-3 border-l-4 border-red-500">
+      <div class="text-xs text-slate-500">AUSENTE/REPROG</div>
+      <div id="kpiAusente" class="text-2xl font-bold text-red-600">0</div>
+    </div>
+    <div class="card bg-white rounded-lg p-3 border-l-4 border-purple-500">
+      <div class="text-xs text-slate-500">EFECTIVIDAD</div>
+      <div id="kpiEfectividad" class="text-2xl font-bold text-purple-600">0%</div>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="bg-white rounded-lg shadow p-3 mb-4">
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
+      <select id="filtroTramo" onchange="aplicarFiltros()" class="border rounded px-2 py-1 text-sm">
+        <option value="">🕐 Todos los Tramos</option>
+        <option value="08AM-12PM">T1: 08AM-12PM</option>
+        <option value="12PM-04PM">T2: 12PM-04PM</option>
+        <option value="04PM-08PM">T3: 04PM-08PM</option>
+      </select>
+      <select id="filtroDistrito" onchange="aplicarFiltros()" class="border rounded px-2 py-1 text-sm">
+        <option value="">📍 Todos los Distritos</option>
+      </select>
+      <select id="filtroEstado" onchange="aplicarFiltros()" class="border rounded px-2 py-1 text-sm">
+        <option value="">📋 Todos los Estados</option>
+        <option value="PENDIENTE">Pendiente</option>
+        <option value="PROGRAMADO">Programado</option>
+        <option value="COORDINADO">Coordinado</option>
+        <option value="EN CAMINO">En Camino</option>
+        <option value="EN PROCESO">En Proceso</option>
+        <option value="FINALIZADO">Finalizado</option>
+        <option value="AUSENTE">Ausente</option>
+        <option value="REPROGRAMA">Reprograma</option>
+        <option value="CANCELADO">Cancelado</option>
+      </select>
+      <select id="filtroTecnico" onchange="aplicarFiltros()" class="border rounded px-2 py-1 text-sm">
+        <option value="">👷 Todos los Técnicos</option>
+      </select>
+      <select id="filtroTipo" onchange="aplicarFiltros()" class="border rounded px-2 py-1 text-sm">
+        <option value="">📦 Todos los Tipos</option>
+        <option value="ALTA NUEVA">Alta Nueva</option>
+        <option value="AVERÍAS">Avería</option>
+        <option value="GARANTÍA">Garantía</option>
+      </select>
+      <input type="text" id="filtroBusqueda" onkeyup="aplicarFiltros()" placeholder="🔍 Buscar cliente/DNI..." class="border rounded px-2 py-1 text-sm">
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="flex gap-2 mb-3 flex-wrap">
+    <button onclick="cambiarTab('dashboard')" id="tab-dashboard" class="tab-active px-4 py-2 rounded-lg font-semibold text-sm">📊 Dashboard</button>
+    <button onclick="cambiarTab('mapa')" id="tab-mapa" class="bg-white px-4 py-2 rounded-lg font-semibold text-sm">🗺️ Mapa</button>
+    <button onclick="cambiarTab('ordenes')" id="tab-ordenes" class="bg-white px-4 py-2 rounded-lg font-semibold text-sm">📋 Órdenes</button>
+    <button onclick="cambiarTab('tecnicos')" id="tab-tecnicos" class="bg-white px-4 py-2 rounded-lg font-semibold text-sm">👷 Técnicos</button>
+    <button onclick="cambiarTab('asignacion')" id="tab-asignacion" class="bg-green-500 text-white px-4 py-2 rounded-lg font-semibold text-sm">⚡ Asignación Rápida</button>
+  </div>
+
+  <!-- CONTENIDO TABS -->
+  <div id="contenido-dashboard" class="tab-content">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white rounded-lg shadow p-4">
+        <h3 class="font-bold text-slate-700 mb-3">📅 Órdenes por Tramo</h3>
+        <div id="resumenTramos" class="space-y-2"></div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4">
+        <h3 class="font-bold text-slate-700 mb-3">📦 Órdenes por Tipo</h3>
+        <div id="resumenTipos" class="space-y-2"></div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4">
+        <h3 class="font-bold text-slate-700 mb-3">📍 Top Distritos</h3>
+        <div id="resumenDistritos" class="space-y-2"></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 mt-4">
+      <h3 class="font-bold text-red-600 mb-3">⚠️ Alertas y Acciones</h3>
+      <div id="alertas" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <div id="contenido-mapa" class="tab-content hidden">
+    <div class="bg-white rounded-lg shadow p-4">
+      <div class="flex justify-between mb-3">
+        <h3 class="font-bold text-slate-700">🗺️ Mapa de Órdenes Activas (Esri Light Gray)</h3>
+        <div class="flex gap-2 text-xs flex-wrap">
+          <span class="badge bg-blue-200 text-blue-800">● Programado</span>
+          <span class="badge bg-indigo-200 text-indigo-800">● Coordinado</span>
+          <span class="badge bg-purple-200 text-purple-800">● En Camino</span>
+          <span class="badge bg-cyan-200 text-cyan-800">● En Proceso</span>
+        </div>
+      </div>
+      <div id="map"></div>
+      <p class="text-xs text-slate-500 mt-2">ℹ️ Solo se muestran órdenes en estados activos: Programado, Coordinado, En Camino, En Proceso</p>
+    </div>
+  </div>
+
+  <div id="contenido-ordenes" class="tab-content hidden">
+    <div class="bg-white rounded-lg shadow p-4">
+      <h3 class="font-bold text-slate-700 mb-3">📋 Listado de Órdenes</h3>
+      <div class="scroll-area">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-200 sticky top-0">
+            <tr>
+              <th class="p-2 text-left">Código</th>
+              <th class="p-2 text-left">Cliente</th>
+              <th class="p-2 text-left">Distrito</th>
+              <th class="p-2 text-left">Tramo</th>
+              <th class="p-2 text-left">Tipo</th>
+              <th class="p-2 text-left">Estado</th>
+              <th class="p-2 text-left">Técnico</th>
+              <th class="p-2 text-left">Teléfono</th>
+              <th class="p-2 text-left">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tablaOrdenes"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="contenido-tecnicos" class="tab-content hidden">
+    <div class="bg-white rounded-lg shadow p-4">
+      <h3 class="font-bold text-slate-700 mb-3">👷 Estado de Técnicos - Disponibilidad y Carga de Trabajo</h3>
+      <p class="text-sm text-slate-600 mb-3">
+        🟢 <b>LIBRE</b>: Sin órdenes Programado/Coordinado · 
+        🟢 <b>PRÓXIMO A LIBRE</b>: 1 orden por atender · 
+        🔴 <b>SATURADO</b>: 2+ órdenes en cualquier tramo (T1/T2/T3)
+      </p>
+      <div id="gridTecnicos" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+    </div>
+  </div>
+
+  <div id="contenido-asignacion" class="tab-content hidden">
+    <div class="bg-white rounded-lg shadow p-4">
+      <h3 class="font-bold text-green-700 mb-3">⚡ Asignación Rápida - Órdenes Pendientes a Técnicos Libres</h3>
+      <p class="text-sm text-slate-600 mb-3">El sistema sugiere asignaciones basadas en: <b>Tramo (col. DR) + Distrito + Disponibilidad del técnico</b> <span class="text-xs text-slate-500">(Incluye: Pendiente, Programado, Coordinado)</span></p>
+      <div id="sugerencias" class="space-y-2"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let datos = [];
+let datosFiltrados = [];
+let map;
+let markers = [];
+
+const ESTADOS_PENDIENTES = ['PENDIENTE', 'PROGRAMADO', 'COORDINADO'];
+const ESTADOS_MAPA = ['PROGRAMADO', 'COORDINADO', 'EN CAMINO', 'EN PROCESO'];
+const ESTADOS_ACTIVOS = ['EN CAMINO', 'EN PROCESO', 'PROGRAMADO', 'COORDINADO'];
+const ESTADOS_TRABAJO_PENDIENTE = ['PROGRAMADO', 'COORDINADO'];
+
+function actualizarReloj() {
+  const ahora = new Date();
+  document.getElementById('fechaActual').textContent = ahora.toLocaleDateString('es-PE', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  document.getElementById('horaActual').textContent = ahora.toLocaleTimeString('es-PE');
+}
+setInterval(actualizarReloj, 1000);
+actualizarReloj();
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const data = new Uint8Array(evt.target.result);
+    const workbook = XLSX.read(data, {type:'array'});
+    procesarExcel(workbook);
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function procesarExcel(wb) {
+  let sheetName = wb.SheetNames.find(n => n.toUpperCase().includes('BASE_PERUFIBRA')) || 
+                  wb.SheetNames.find(n => n.toUpperCase().includes('PERUFIBRA')) || 
+                  wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const jsonData = XLSX.utils.sheet_to_json(sheet, {defval:'', header:1, blankrows:false});
+  
+  if (jsonData.length < 2) {
+    alert('❌ La hoja está vacía');
+    return;
+  }
+  
+  const headers = jsonData[0].map(h => (h||'').toString().trim());
+  const idxDR = 121;
+  
+  console.log('Headers encontrados:', headers.length);
+  console.log('Columna DR (índice 121):', headers[idxDR]);
+  
+  const colMap = {};
+  headers.forEach((h, i) => { if(h) colMap[h] = i; });
+  
+  const rows = jsonData.slice(1).filter(r => r && r.length > 0 && r[0]);
+  
+  datos = rows.map(row => {
+    let tramoValor = row[idxDR] || '';
+    
+    return {
+      codigo: row[colMap['cod_pedido']] || row[colMap['Codigo']] || row[colMap['id_contrato']] || '',
+      cliente: row[colMap['nom_cliente']] || row[colMap['Cliente']] || '',
+      dni: row[colMap['dni_cliente']] || row[colMap['dni']] || '',
+      distrito: row[colMap['Distrito_1']] || row[colMap['Distrito']] || '',
+      provincia: row[colMap['Provincia']] || '',
+      direccion: row[colMap['direccion_cliente']] || row[colMap['Direccion']] || '',
+      latitud: parseFloat(row[colMap['latitud']]) || 0,
+      longitud: parseFloat(row[colMap['longitud']]) || 0,
+      tramo: normalizarTramo(tramoValor),
+      tramoOriginal: tramoValor.toString(),
+      tipo: row[colMap['tipo']] || row[colMap['Tipo_alta']] || '',
+      estado: (row[colMap['Estado']] || row[colMap['Estado_1']] || '').toString().toUpperCase().trim(),
+      tecnico: row[colMap['Tecnico']] || '',
+      celTecnico: row[colMap['Cel_Tecnico']] || '',
+      telefono: row[colMap['telefono']] || '',
+      telAlternativo: row[colMap['telefono_alternativo']] || '',
+      statusLlamada: row[colMap['Status de Llamada']] || '',
+      observaciones: row[colMap['Observaciones']] || row[colMap['comentario_programador']] || '',
+      reingreso: row[colMap['Reingreso']] || 0,
+      fecha: row[colMap['fecha_programacion']] || row[colMap['fec_programacion']] || '',
+      paquete: row[colMap['Paquete']] || '',
+      cto1: row[colMap['cto1']] || ''
+    };
+  }).filter(r => r.codigo !== '');
+  
+  datosFiltrados = [...datos];
+  poblarFiltros();
+  renderizarTodo();
+  alert(`✅ Se cargaron ${datos.length} órdenes correctamente\n📌 Tramos leídos desde columna DR`);
+}
+
+function normalizarTramo(t) {
+  if (!t) return '';
+  t = t.toString().toUpperCase().trim();
+  if (t.includes('08') && (t.includes('12') || t.includes('12PM'))) return '08AM-12PM';
+  if (t.match(/12.*16/) || t.match(/12PM.*04PM/) || t.match(/12.*4PM/) || t.includes('12PM-04PM')) return '12PM-04PM';
+  if (t.match(/16.*20/) || t.match(/04PM.*08PM/) || t.match(/4PM.*8PM/) || t.includes('04PM-08PM') || t.includes('16PM-20PM')) return '04PM-08PM';
+  return t;
+}
+
+function poblarFiltros() {
+  const distritos = [...new Set(datos.map(d => d.distrito).filter(Boolean))].sort();
+  const tecnicos = [...new Set(datos.map(d => d.tecnico).filter(Boolean))].sort();
+  
+  const selDist = document.getElementById('filtroDistrito');
+  selDist.innerHTML = '<option value="">📍 Todos los Distritos</option>' + 
+    distritos.map(d => `<option value="${d}">${d}</option>`).join('');
+  
+  const selTec = document.getElementById('filtroTecnico');
+  selTec.innerHTML = '<option value="">👷 Todos los Técnicos</option>' + 
+    tecnicos.map(t => `<option value="${t}">${t}</option>`).join('');
+}
+
+function aplicarFiltros() {
+  const tramo = document.getElementById('filtroTramo').value;
+  const distrito = document.getElementById('filtroDistrito').value;
+  const estado = document.getElementById('filtroEstado').value;
+  const tecnico = document.getElementById('filtroTecnico').value;
+  const tipo = document.getElementById('filtroTipo').value;
+  const busq = document.getElementById('filtroBusqueda').value.toLowerCase();
+  
+  datosFiltrados = datos.filter(d => {
+    if (tramo && d.tramo !== tramo) return false;
+    if (distrito && d.distrito !== distrito) return false;
+    if (estado && d.estado !== estado) return false;
+    if (tecnico && d.tecnico !== tecnico) return false;
+    if (tipo && d.tipo !== tipo) return false;
+    if (busq && !(d.cliente.toLowerCase().includes(busq) || d.dni.toString().includes(busq) || d.codigo.toString().includes(busq))) return false;
+    return true;
+  });
+  renderizarTodo();
+}
+
+function renderizarTodo() {
+  renderKPIs();
+  renderDashboard();
+  renderOrdenes();
+  renderTecnicos();
+  renderSugerencias();
+  if (!document.getElementById('contenido-mapa').classList.contains('hidden')) renderMapa();
+}
+
+function renderKPIs() {
+  const d = datosFiltrados;
+  document.getElementById('kpiTotal').textContent = d.length;
+  document.getElementById('kpiFinalizadas').textContent = d.filter(x => x.estado === 'FINALIZADO').length;
+  document.getElementById('kpiProceso').textContent = d.filter(x => ['EN PROCESO','EN CAMINO'].includes(x.estado)).length;
+  document.getElementById('kpiPendientes').textContent = d.filter(x => ESTADOS_PENDIENTES.includes(x.estado)).length;
+  document.getElementById('kpiAusente').textContent = d.filter(x => ['AUSENTE','REPROGRAMA','CANCELADO'].includes(x.estado)).length;
+  const fin = d.filter(x => x.estado === 'FINALIZADO').length;
+  const totalGestion = d.filter(x => !ESTADOS_PENDIENTES.includes(x.estado)).length;
+  const ef = totalGestion > 0 ? Math.round((fin/totalGestion)*100) : 0;
+  document.getElementById('kpiEfectividad').textContent = ef + '%';
+}
+
+function renderDashboard() {
+  const tramos = ['08AM-12PM','12PM-04PM','04PM-08PM'];
+  const coloresTramo = {'08AM-12PM':'bg-yellow-100 text-yellow-800','12PM-04PM':'bg-blue-100 text-blue-800','04PM-08PM':'bg-pink-100 text-pink-800'};
+  document.getElementById('resumenTramos').innerHTML = tramos.map(t => {
+    const total = datosFiltrados.filter(d => d.tramo === t).length;
+    const fin = datosFiltrados.filter(d => d.tramo === t && d.estado === 'FINALIZADO').length;
+    const pend = datosFiltrados.filter(d => d.tramo === t && ESTADOS_PENDIENTES.includes(d.estado)).length;
+    return `<div class="p-2 rounded ${coloresTramo[t]}">
+      <div class="flex justify-between font-semibold"><span>${t}</span><span>${total} órdenes</span></div>
+      <div class="text-xs mt-1">✅ ${fin} finalizadas · ⏳ ${pend} pendientes</div>
+    </div>`;
+  }).join('');
+  
+  const tipos = ['ALTA NUEVA','AVERÍAS','GARANTÍA'];
+  document.getElementById('resumenTipos').innerHTML = tipos.map(t => {
+    const c = datosFiltrados.filter(d => d.tipo === t).length;
+    const colores = {'ALTA NUEVA':'bg-green-100 text-green-800','AVERÍAS':'bg-red-100 text-red-800','GARANTÍA':'bg-orange-100 text-orange-800'};
+    return `<div class="p-2 rounded ${colores[t]||'bg-slate-100'} flex justify-between"><span>${t}</span><span class="font-bold">${c}</span></div>`;
+  }).join('');
+  
+  const dists = {};
+  datosFiltrados.forEach(d => { if(d.distrito) dists[d.distrito] = (dists[d.distrito]||0)+1; });
+  const topDists = Object.entries(dists).sort((a,b) => b[1]-a[1]).slice(0,5);
+  document.getElementById('resumenDistritos').innerHTML = topDists.map(([d,c]) => {
+    const pct = datosFiltrados.length > 0 ? Math.round((c/datosFiltrados.length)*100) : 0;
+    return `<div class="flex justify-between text-sm"><span>${d}</span><span class="font-semibold">${c} (${pct}%)</span></div>`;
+  }).join('') || '<p class="text-sm text-slate-500">Sin datos</p>';
+  
+  const reingresos = datosFiltrados.filter(d => d.reingreso > 0);
+  const ausentes = datosFiltrados.filter(d => d.estado === 'AUSENTE');
+  const sinCoord = datosFiltrados.filter(d => ESTADOS_PENDIENTES.includes(d.estado) && !d.statusLlamada);
+  
+  let alertasHTML = '';
+  if (reingresos.length > 0) {
+    alertasHTML += `<div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
+      <b>🔴 ${reingresos.length} Reingresos detectados</b> - Priorizar atención
+      <div class="text-xs mt-1">${reingresos.slice(0,3).map(r => `• ${r.codigo} - ${r.cliente} (${r.reingreso}x)`).join('<br>')}</div>
+    </div>`;
+  }
+  if (ausentes.length > 0) {
+    alertasHTML += `<div class="bg-orange-50 border-l-4 border-orange-500 p-3 rounded">
+      <b>🟠 ${ausentes.length} Clientes AUSENTES</b> - Reprogramar o cancelar
+    </div>`;
+  }
+  if (sinCoord.length > 0) {
+    alertasHTML += `<div class="bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded">
+      <b>🟡 ${sinCoord.length} Pendientes sin coordinar</b> - Llamar antes de asignar
+    </div>`;
+  }
+  if (!alertasHTML) alertasHTML = '<p class="text-green-600">✅ Sin alertas críticas</p>';
+  document.getElementById('alertas').innerHTML = alertasHTML;
+}
+
+function renderOrdenes() {
+  const tbody = document.getElementById('tablaOrdenes');
+  const estadoColor = {
+    'PENDIENTE':'bg-yellow-100 text-yellow-800',
+    'PROGRAMADO':'bg-blue-100 text-blue-800',
+    'COORDINADO':'bg-indigo-100 text-indigo-800',
+    'EN CAMINO':'bg-purple-100 text-purple-800',
+    'EN PROCESO':'bg-cyan-100 text-cyan-800',
+    'FINALIZADO':'bg-green-100 text-green-800',
+    'AUSENTE':'bg-red-100 text-red-800',
+    'REPROGRAMA':'bg-orange-100 text-orange-800',
+    'CANCELADO':'bg-slate-200 text-slate-700'
+  };
+  tbody.innerHTML = datosFiltrados.slice(0,200).map(d => `
+    <tr class="border-b hover:bg-slate-50">
+      <td class="p-2 font-mono">${d.codigo}</td>
+      <td class="p-2">${d.cliente}<br><span class="text-slate-500 text-[10px]">${d.dni}</span></td>
+      <td class="p-2">${d.distrito}</td>
+      <td class="p-2 text-xs">${d.tramo}</td>
+      <td class="p-2 text-xs">${d.tipo}</td>
+      <td class="p-2"><span class="badge ${estadoColor[d.estado]||'bg-slate-100'}">${d.estado}</span></td>
+      <td class="p-2 text-xs">${d.tecnico||'<i class="text-slate-400">Sin asignar</i>'}</td>
+      <td class="p-2 text-xs">${d.telefono}</td>
+      <td class="p-2"><button onclick="verDetalle('${d.codigo}')" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">Ver</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderTecnicos() {
+  const tecnicos = {};
+  datos.forEach(d => {
+    if (!d.tecnico) return;
+    if (!tecnicos[d.tecnico]) {
+      tecnicos[d.tecnico] = {
+        // ✅ T1, T2, T3 solo cuentan PROGRAMADO + COORDINADO
+        T1:0, T2:0, T3:0,
+        finalizadas:0,
+        enCamino:0, enProceso:0, programado:0, coordinado:0,
+        totalTrabajoPendiente:0,
+        totalActivas:0,
+        total:0,
+        cel:d.celTecnico,
+        distritos:{}
+      };
+    }
+    const t = tecnicos[d.tecnico];
+    t.total++;
+    
+    // ✅ SOLO contar en T1/T2/T3 las órdenes PROGRAMADO o COORDINADO
+    if (ESTADOS_TRABAJO_PENDIENTE.includes(d.estado)) {
+      if (d.tramo === '08AM-12PM') t.T1++;
+      if (d.tramo === '12PM-04PM') t.T2++;
+      if (d.tramo === '04PM-08PM') t.T3++;
+    }
+    
+    if (d.estado === 'FINALIZADO') t.finalizadas++;
+    
+    if (d.estado === 'EN CAMINO') t.enCamino++;
+    if (d.estado === 'EN PROCESO') t.enProceso++;
+    if (d.estado === 'PROGRAMADO') t.programado++;
+    if (d.estado === 'COORDINADO') t.coordinado++;
+    
+    if (ESTADOS_TRABAJO_PENDIENTE.includes(d.estado)) t.totalTrabajoPendiente++;
+    
+    if (ESTADOS_ACTIVOS.includes(d.estado)) t.totalActivas++;
+    
+    if (d.distrito) t.distritos[d.distrito] = (t.distritos[d.distrito]||0) + 1;
+  });
+  
+  const grid = document.getElementById('gridTecnicos');
+  grid.innerHTML = Object.entries(tecnicos).map(([nom,t]) => {
+    const cargaPendiente = t.totalTrabajoPendiente;
+    const trabajandoAhora = t.enCamino + t.enProceso;
+    
+    // ✅ NUEVA LÓGICA: Si T1, T2 o T3 >= 2 → SATURADO
+    let estadoTexto, estadoClase, estadoIcono;
+    if (t.T1 >= 2 || t.T2 >= 2 || t.T3 >= 2) {
+      estadoTexto = '🔴 SATURADO';
+      estadoClase = 'estado-saturado';
+      estadoIcono = '🚨';
+    } else if (cargaPendiente === 0) {
+      estadoTexto = '🟢 LIBRE';
+      estadoClase = 'estado-libre';
+      estadoIcono = '✅';
+    } else if (cargaPendiente === 1) {
+      estadoTexto = '🟢 PRÓXIMO A LIBRE';
+      estadoClase = 'estado-proximo';
+      estadoIcono = '⏳';
+    } else {
+      estadoTexto = '🟡 ACTIVO';
+      estadoClase = 'estado-activo';
+      estadoIcono = '⚡';
+    }
+    
+    const ef = t.total > 0 ? Math.round((t.finalizadas/t.total)*100) : 0;
+    
+    const distritos = Object.entries(t.distritos).sort((a,b) => b[1]-a[1]);
+    const distritoPrincipal = distritos.length > 0 ? distritos[0][0] : 'N/A';
+    
+    let mensajeEstado = '';
+    if (t.T1 >= 2 || t.T2 >= 2 || t.T3 >= 2) {
+      mensajeEstado = '⚠️ Tramo saturado (≥2 órdenes) - No asignar más trabajo';
+    } else if (cargaPendiente === 0) {
+      if (trabajandoAhora > 0) {
+        mensajeEstado = `Trabajando en ${trabajandoAhora} orden(es), sin trabajo pendiente`;
+      } else {
+        mensajeEstado = 'Sin trabajo asignado - Disponible para nuevas órdenes';
+      }
+    } else {
+      mensajeEstado = `${cargaPendiente} orden(es) por atender`;
+    }
+    
+    // ✅ Color rojo para tramos saturados (>=2)
+    const t1Class = t.T1 >= 2 ? 'bg-red-100 border-red-500' : 'tramo-t1';
+    const t2Class = t.T2 >= 2 ? 'bg-red-100 border-red-500' : 'tramo-t2';
+    const t3Class = t.T3 >= 2 ? 'bg-red-100 border-red-500' : 'tramo-t3';
+    
+    return `<div class="card ${estadoClase} rounded-lg p-4 shadow">
+      <div class="flex justify-between items-start mb-3">
+        <div>
+          <div class="font-bold text-base">${nom}</div>
+          <div class="text-sm text-slate-600 info-line">📱 ${t.cel||'N/A'}</div>
+          <div class="text-sm text-slate-500 info-line">📍 ${distritoPrincipal}</div>
+        </div>
+        <div class="text-right">
+          <div class="estado-texto font-bold">${estadoTexto}</div>
+          <div class="estado-icono">${estadoIcono}</div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded p-3 mb-3">
+        <div class="text-sm font-semibold text-slate-700 mb-1 info-line">📋 Trabajo Pendiente (Prog. + Coord.): <span class="carga-numero text-blue-700">${cargaPendiente}</span></div>
+        <div class="text-xs text-slate-500 mb-2 sub-label">${mensajeEstado}</div>
+        <div class="grid grid-cols-4 gap-1 text-center">
+          <div class="estado-orden bg-purple-50 rounded">
+            <div class="font-bold text-purple-700">${t.enCamino}</div>
+            <div class="text-[10px]">En Camino</div>
+          </div>
+          <div class="estado-orden bg-cyan-50 rounded">
+            <div class="font-bold text-cyan-700">${t.enProceso}</div>
+            <div class="text-[10px]">En Proceso</div>
+          </div>
+          <div class="estado-orden bg-blue-50 rounded">
+            <div class="font-bold text-blue-700">${t.programado}</div>
+            <div class="text-[10px]">Programado</div>
+          </div>
+          <div class="estado-orden bg-indigo-50 rounded">
+            <div class="font-bold text-indigo-700">${t.coordinado}</div>
+            <div class="text-[10px]">Coordinado</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-3 gap-1 text-center mb-3">
+        <div class="${t1Class} rounded tramo-box"><div class="font-bold">${t.T1}</div><div class="text-[11px]">T1 (08-12)</div></div>
+        <div class="${t2Class} rounded tramo-box"><div class="font-bold">${t.T2}</div><div class="text-[11px]">T2 (12-16)</div></div>
+        <div class="${t3Class} rounded tramo-box"><div class="font-bold">${t.T3}</div><div class="text-[11px]">T3 (16-20)</div></div>
+      </div>
+      
+      <div class="flex justify-between text-sm info-line">
+        <span>✅ ${t.finalizadas} finalizadas</span>
+        <span class="font-bold text-purple-600">📊 ${ef}% efectividad</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSugerencias() {
+  const pendientes = datosFiltrados.filter(d => ESTADOS_PENDIENTES.includes(d.estado) && d.latitud && d.longitud);
+  const tecnicos = {};
+  datos.forEach(d => {
+    if (!d.tecnico) return;
+    if (!tecnicos[d.tecnico]) {
+      tecnicos[d.tecnico] = {
+        T1:0, T2:0, T3:0,
+        totalTrabajoPendiente:0,
+        cel:d.celTecnico,
+        distritos:{}
+      };
+    }
+    const t = tecnicos[d.tecnico];
+    // ✅ Solo contar PROGRAMADO + COORDINADO para T1/T2/T3
+    if (ESTADOS_TRABAJO_PENDIENTE.includes(d.estado)) {
+      if (d.tramo === '08AM-12PM') t.T1++;
+      if (d.tramo === '12PM-04PM') t.T2++;
+      if (d.tramo === '04PM-08PM') t.T3++;
+    }
+    if (ESTADOS_TRABAJO_PENDIENTE.includes(d.estado)) t.totalTrabajoPendiente++;
+    t.distritos[d.distrito] = (t.distritos[d.distrito]||0) + 1;
+  });
+  
+  const sugerencias = [];
+  pendientes.forEach(p => {
+    const candidatos = Object.entries(tecnicos)
+      .filter(([nom,t]) => {
+        // ✅ No sugerir técnicos saturados (T1, T2 o T3 >= 2)
+        return t.T1 < 2 && t.T2 < 2 && t.T3 < 2;
+      })
+      .map(([nom,t]) => {
+        let score = 0;
+        if (t.distritos[p.distrito]) score += 10;
+        if (p.tramo === '08AM-12PM' && t.T1 < 1) score += 5;
+        if (p.tramo === '12PM-04PM' && t.T2 < 1) score += 5;
+        if (p.tramo === '04PM-08PM' && t.T3 < 1) score += 5;
+        score -= t.totalTrabajoPendiente;
+        return {nom, score, cel:t.cel, carga:t.totalTrabajoPendiente, T1:t.T1, T2:t.T2, T3:t.T3};
+      })
+      .sort((a,b) => b.score - a.score);
+    
+    if (candidatos[0]) {
+      sugerencias.push({
+        orden: p,
+        tecnico: candidatos[0].nom,
+        score: candidatos[0].score,
+        cel: candidatos[0].cel,
+        cargaActual: candidatos[0].carga,
+        T1: candidatos[0].T1,
+        T2: candidatos[0].T2,
+        T3: candidatos[0].T3
+      });
+    }
+  });
+  
+  const cont = document.getElementById('sugerencias');
+  if (sugerencias.length === 0) {
+    cont.innerHTML = '<p class="text-slate-500">No hay sugerencias. Carga un Excel con órdenes pendientes.</p>';
+    return;
+  }
+  cont.innerHTML = sugerencias.slice(0,15).map(s => `
+    <div class="border rounded p-2 flex justify-between items-center hover:bg-green-50">
+      <div class="flex-1">
+        <div class="font-semibold text-sm">📦 ${s.orden.codigo} - ${s.orden.cliente}</div>
+        <div class="text-xs text-slate-600">📍 ${s.orden.distrito} · 🕐 ${s.orden.tramo} · 📱 ${s.orden.telefono} · <span class="badge bg-blue-100 text-blue-800">${s.orden.estado}</span></div>
+      </div>
+      <div class="text-right">
+        <div class="text-xs text-green-700 font-semibold">➡️ Asignar a:</div>
+        <div class="text-sm font-bold text-blue-700">${s.tecnico}</div>
+        <div class="text-xs text-slate-500">Score: ${s.score} · Carga: ${s.cargaActual} · 📱 ${s.cel}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderMapa() {
+  if (!map) {
+    map = L.map('map').setView([-12.046374, -77.042793], 11);
+    
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles © Esri — Esri, DeLorme, NAVTEQ',
+      maxZoom: 19
+    }).addTo(map);
+    
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19
+    }).addTo(map);
+  }
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  
+  const colorEstado = {
+    'PROGRAMADO':'#3b82f6',
+    'COORDINADO':'#6366f1',
+    'EN CAMINO':'#8b5cf6',
+    'EN PROCESO':'#06b6d4'
+  };
+  
+  const ordenesMapa = datosFiltrados.filter(d => ESTADOS_MAPA.includes(d.estado));
+  
+  ordenesMapa.forEach(d => {
+    if (!d.latitud || !d.longitud) return;
+    const color = colorEstado[d.estado] || '#94a3b8';
+    const marker = L.circleMarker([d.latitud, d.longitud], {
+      radius: 8, fillColor: color, color: '#fff', weight: 2, fillOpacity: 0.9
+    }).addTo(map);
+    marker.bindPopup(`
+      <div style="min-width:220px">
+        <b style="color:#1e40af">${d.codigo}</b><br>
+        👤 ${d.cliente}<br>
+        📍 ${d.direccion}<br>
+        🏘️ ${d.distrito}<br>
+        🕐 <b>Tramo: ${d.tramo}</b><br>
+        📦 ${d.tipo}<br>
+        📊 <span style="color:${color}"><b>${d.estado}</b></span><br>
+        👷 ${d.tecnico||'Sin asignar'}<br>
+        📞 ${d.telefono}
+      </div>
+    `);
+    markers.push(marker);
+  });
+  
+  if (markers.length > 0) {
+    const group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds().pad(0.1));
+  }
+}
+
+function cambiarTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('[id^="tab-"]').forEach(el => {
+    el.classList.remove('tab-active','bg-green-500','text-white');
+    el.classList.add('bg-white');
+  });
+  document.getElementById('contenido-' + tab).classList.remove('hidden');
+  const btn = document.getElementById('tab-' + tab);
+  if (tab === 'asignacion') {
+    btn.classList.add('bg-green-500','text-white');
+  } else {
+    btn.classList.add('tab-active');
+  }
+  if (tab === 'mapa') setTimeout(renderMapa, 100);
+}
+
+function verDetalle(codigo) {
+  const d = datos.find(x => x.codigo == codigo);
+  if (!d) return;
+  alert(`📦 ORDEN ${d.codigo}\n\n👤 Cliente: ${d.cliente}\n🆔 DNI: ${d.dni}\n📍 Dirección: ${d.direccion}\n🏘️ Distrito: ${d.distrito}\n🕐 Tramo (col.DR): ${d.tramo}\n📦 Tipo: ${d.tipo}\n📊 Estado: ${d.estado}\n👷 Técnico: ${d.tecnico||'Sin asignar'}\n📱 Tel: ${d.telefono}\n📞 Alt: ${d.telAlternativo}\n📡 CTO: ${d.cto1}\n📝 Obs: ${d.observaciones}`);
+}
+
+function actualizarDatos() {
+  renderizarTodo();
+  alert('✅ Datos actualizados');
+}
+
+window.addEventListener('load', () => {
+  document.getElementById('contenido-dashboard').classList.remove('hidden');
+});
+</script>
+</body>
+</html>
