@@ -7,26 +7,48 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  body { font-family: 'Segoe UI', sans-serif; }
-  .tab-active { background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; }
-  .card { transition: all 0.3s; }
-  .card:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-  .badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  :root{
+    --ink:#1B2A41; --ink-soft:#5B6B82; --line:#E3E8EF;
+    --surface:#FFFFFF; --canvas:#F3F6FA;
+    --primary:#1E4B8F; --primary-dark:#153663; --primary-tint:#EAF1FC;
+    --teal:#0E8F86; --teal-tint:#E4F5F3;
+    --amber:#B7791F; --amber-tint:#FBF1DE;
+    --rose:#B5495B; --rose-tint:#FBE9EC;
+    --green:#1F8A5E; --green-tint:#E5F5EE;
+    --indigo:#4A47A3; --indigo-tint:#EAEAFB;
+    --violet:#7C4FA0; --violet-tint:#F1E7F5;
+  }
+  * { font-family: 'Inter', 'Segoe UI', sans-serif; }
+  body { background: var(--canvas); color: var(--ink); }
+  .card { background: var(--surface); border: 1px solid var(--line); transition: box-shadow .2s ease; }
+  .card:hover { box-shadow: 0 6px 18px rgba(27,42,65,0.08); }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+  .tab-btn { background: var(--surface); border: 1px solid var(--line); color: var(--ink-soft); }
+  .tab-btn:hover { color: var(--ink); border-color: #C9D3E0; }
+  .tab-active { background: var(--primary); border: 1px solid var(--primary); color: #fff !important; box-shadow: 0 3px 10px rgba(30,75,143,0.25); }
+  .tab-accent { background: var(--teal); border: 1px solid var(--teal); color: #fff !important; box-shadow: 0 3px 10px rgba(14,143,134,0.22); }
+  .badge { padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: .01em; }
   .pulse { animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
-  #map { height: 500px; border-radius: 8px; }
+  #map { height: 500px; border-radius: 10px; }
   .scroll-area { max-height: 500px; overflow-y: auto; }
   .scroll-area::-webkit-scrollbar { width: 6px; }
-  .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-  .tramo-t1 { background: #fef3c7; border-left: 4px solid #f59e0b; }
-  .tramo-t2 { background: #dbeafe; border-left: 4px solid #3b82f6; }
-  .tramo-t3 { background: #fce7f3; border-left: 4px solid #ec4899; }
-  .estado-libre { background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-left: 6px solid #10b981; }
-  .estado-proximo { background: linear-gradient(135deg, #dcfce7, #bbf7d0); border-left: 6px solid #22c55e; }
-  .estado-activo { background: linear-gradient(135deg, #fef3c7, #fde68a); border-left: 6px solid #f59e0b; }
-  .estado-saturado { background: linear-gradient(135deg, #fee2e2, #fecaca); border-left: 6px solid #ef4444; }
-  
+  .scroll-area::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+  .input-field { background: var(--surface); border: 1px solid var(--line); color: var(--ink); }
+  .input-field:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-tint); }
+
+  .tramo-t1 { background: var(--amber-tint); border-left: 4px solid #D9A441; color: #7A5714; }
+  .tramo-t2 { background: var(--primary-tint); border-left: 4px solid #6E9FE0; color: var(--primary-dark); }
+  .tramo-t3 { background: var(--rose-tint); border-left: 4px solid #D98AA0; color: #96324A; }
+  .estado-libre { background: var(--green-tint); border-left: 6px solid var(--green); }
+  .estado-proximo { background: #ECF7EF; border-left: 6px solid #4CA579; }
+  .estado-activo { background: var(--amber-tint); border-left: 6px solid var(--amber); }
+  .estado-saturado { background: var(--rose-tint); border-left: 6px solid var(--rose); }
+  .tramo-saturado { background: var(--rose-tint); border-left: 4px solid var(--rose); color: #96324A; }
+
   /* Fuentes más grandes para sección técnicos */
   #gridTecnicos .card { font-size: 14px; }
   #gridTecnicos .card .font-bold { font-size: 16px; }
@@ -41,28 +63,28 @@
   #gridTecnicos .card .info-line { font-size: 14px !important; }
 </style>
 </head>
-<body class="bg-slate-100">
+<body>
 
 <!-- HEADER -->
-<header class="bg-gradient-to-r from-blue-900 to-blue-700 text-white shadow-lg">
+<header style="background: var(--primary-dark);" class="text-white">
   <div class="container mx-auto px-4 py-3 flex justify-between items-center">
     <div class="flex items-center gap-3">
-      <div class="bg-white text-blue-900 rounded-lg p-2 font-bold text-xl">PF</div>
+      <div style="background:#fff; color: var(--primary-dark);" class="rounded-lg px-3 py-2 font-extrabold text-lg tracking-tight">PF</div>
       <div>
-        <h1 class="text-xl font-bold">PeruFibra Control</h1>
-        <p class="text-xs text-blue-200">Sistema de Asignación Inteligente por Tramos</p>
+        <h1 class="text-lg font-bold leading-tight">PeruFibra Control</h1>
+        <p class="text-xs" style="color:#AEC3E3;">Sistema de Asignación Inteligente por Tramos</p>
       </div>
     </div>
     <div class="flex items-center gap-3">
-      <div class="text-right text-sm">
-        <div id="fechaActual" class="font-semibold"></div>
-        <div id="horaActual" class="text-blue-200 text-xs"></div>
+      <div class="text-right text-sm hidden sm:block">
+        <div id="fechaActual" class="font-medium"></div>
+        <div id="horaActual" class="text-xs" style="color:#AEC3E3;"></div>
       </div>
-      <label class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg cursor-pointer font-semibold shadow">
+      <label style="background: var(--teal);" class="hover:opacity-90 px-4 py-2 rounded-lg cursor-pointer font-semibold text-sm shadow-sm transition">
         📁 Cargar Excel
         <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
       </label>
-      <button onclick="actualizarDatos()" class="bg-yellow-500 hover:bg-yellow-600 px-4 py-2 rounded-lg font-semibold shadow">
+      <button onclick="actualizarDatos()" style="background:#fff; color: var(--primary-dark);" class="hover:opacity-90 px-4 py-2 rounded-lg font-semibold text-sm shadow-sm transition">
         🔄 Actualizar
       </button>
     </div>
@@ -73,46 +95,64 @@
 
   <!-- KPIs -->
   <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
-    <div class="card bg-white rounded-lg p-3 border-l-4 border-blue-500">
-      <div class="text-xs text-slate-500">TOTAL ÓRDENES</div>
-      <div id="kpiTotal" class="text-2xl font-bold text-blue-700">0</div>
+    <div class="card rounded-xl p-3">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="kpi-icon" style="background: var(--primary-tint); color: var(--primary); width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px;">📦</div>
+        <div class="text-xs font-medium" style="color: var(--ink-soft);">TOTAL ÓRDENES</div>
+      </div>
+      <div id="kpiTotal" class="text-2xl font-bold" style="color: var(--primary);">0</div>
     </div>
-    <div class="card bg-white rounded-lg p-3 border-l-4 border-green-500">
-      <div class="text-xs text-slate-500">FINALIZADAS</div>
-      <div id="kpiFinalizadas" class="text-2xl font-bold text-green-600">0</div>
+    <div class="card rounded-xl p-3">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="kpi-icon" style="background: var(--green-tint); color: var(--green); width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px;">✅</div>
+        <div class="text-xs font-medium" style="color: var(--ink-soft);">FINALIZADAS</div>
+      </div>
+      <div id="kpiFinalizadas" class="text-2xl font-bold" style="color: var(--green);">0</div>
     </div>
-    <div class="card bg-white rounded-lg p-3 border-l-4 border-yellow-500">
-      <div class="text-xs text-slate-500">EN PROCESO</div>
-      <div id="kpiProceso" class="text-2xl font-bold text-yellow-600">0</div>
+    <div class="card rounded-xl p-3">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="kpi-icon" style="background: var(--amber-tint); color: var(--amber); width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px;">🕐</div>
+        <div class="text-xs font-medium" style="color: var(--ink-soft);">EN PROCESO</div>
+      </div>
+      <div id="kpiProceso" class="text-2xl font-bold" style="color: var(--amber);">0</div>
     </div>
-    <div class="card bg-white rounded-lg p-3 border-l-4 border-orange-500">
-      <div class="text-xs text-slate-500">PENDIENTES</div>
-      <div id="kpiPendientes" class="text-2xl font-bold text-orange-600">0</div>
-      <div class="text-[9px] text-slate-400 mt-1">Pend. + Prog. + Coord.</div>
+    <div class="card rounded-xl p-3">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="kpi-icon" style="background: #FBEADD; color: #B15A1E; width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px;">⏳</div>
+        <div class="text-xs font-medium" style="color: var(--ink-soft);">PENDIENTES</div>
+      </div>
+      <div id="kpiPendientes" class="text-2xl font-bold" style="color: #B15A1E;">0</div>
+      <div class="text-[9px] mt-1" style="color:#9AA6B5;">Pend. + Prog. + Coord.</div>
     </div>
-    <div class="card bg-white rounded-lg p-3 border-l-4 border-red-500">
-      <div class="text-xs text-slate-500">AUSENTE/REPROG</div>
-      <div id="kpiAusente" class="text-2xl font-bold text-red-600">0</div>
+    <div class="card rounded-xl p-3">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="kpi-icon" style="background: var(--rose-tint); color: var(--rose); width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px;">⚠️</div>
+        <div class="text-xs font-medium" style="color: var(--ink-soft);">AUSENTE/REPROG</div>
+      </div>
+      <div id="kpiAusente" class="text-2xl font-bold" style="color: var(--rose);">0</div>
     </div>
-    <div class="card bg-white rounded-lg p-3 border-l-4 border-purple-500">
-      <div class="text-xs text-slate-500">EFECTIVIDAD</div>
-      <div id="kpiEfectividad" class="text-2xl font-bold text-purple-600">0%</div>
+    <div class="card rounded-xl p-3">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="kpi-icon" style="background: var(--teal-tint); color: var(--teal); width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px;">📊</div>
+        <div class="text-xs font-medium" style="color: var(--ink-soft);">EFECTIVIDAD</div>
+      </div>
+      <div id="kpiEfectividad" class="text-2xl font-bold" style="color: var(--teal);">0%</div>
     </div>
   </div>
 
   <!-- FILTROS -->
-  <div class="bg-white rounded-lg shadow p-3 mb-4">
+  <div class="panel p-3 mb-4">
     <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
-      <select id="filtroTramo" onchange="aplicarFiltros()" class="border rounded px-2 py-1 text-sm">
+      <select id="filtroTramo" onchange="aplicarFiltros()" class="input-field rounded-lg px-2 py-1.5 text-sm">
         <option value="">🕐 Todos los Tramos</option>
         <option value="08AM-12PM">T1: 08AM-12PM</option>
         <option value="12PM-04PM">T2: 12PM-04PM</option>
         <option value="04PM-08PM">T3: 04PM-08PM</option>
       </select>
-      <select id="filtroDistrito" onchange="aplicarFiltros()" class="border rounded px-2 py-1 text-sm">
+      <select id="filtroDistrito" onchange="aplicarFiltros()" class="input-field rounded-lg px-2 py-1.5 text-sm">
         <option value="">📍 Todos los Distritos</option>
       </select>
-      <select id="filtroEstado" onchange="aplicarFiltros()" class="border rounded px-2 py-1 text-sm">
+      <select id="filtroEstado" onchange="aplicarFiltros()" class="input-field rounded-lg px-2 py-1.5 text-sm">
         <option value="">📋 Todos los Estados</option>
         <option value="PENDIENTE">Pendiente</option>
         <option value="PROGRAMADO">Programado</option>
@@ -124,82 +164,82 @@
         <option value="REPROGRAMA">Reprograma</option>
         <option value="CANCELADO">Cancelado</option>
       </select>
-      <select id="filtroTecnico" onchange="aplicarFiltros()" class="border rounded px-2 py-1 text-sm">
+      <select id="filtroTecnico" onchange="aplicarFiltros()" class="input-field rounded-lg px-2 py-1.5 text-sm">
         <option value="">👷 Todos los Técnicos</option>
       </select>
-      <select id="filtroTipo" onchange="aplicarFiltros()" class="border rounded px-2 py-1 text-sm">
+      <select id="filtroTipo" onchange="aplicarFiltros()" class="input-field rounded-lg px-2 py-1.5 text-sm">
         <option value="">📦 Todos los Tipos</option>
         <option value="ALTA NUEVA">Alta Nueva</option>
         <option value="AVERÍAS">Avería</option>
         <option value="GARANTÍA">Garantía</option>
       </select>
-      <input type="text" id="filtroBusqueda" onkeyup="aplicarFiltros()" placeholder="🔍 Buscar cliente/DNI..." class="border rounded px-2 py-1 text-sm">
+      <input type="text" id="filtroBusqueda" onkeyup="aplicarFiltros()" placeholder="🔍 Buscar cliente/DNI..." class="input-field rounded-lg px-2 py-1.5 text-sm">
     </div>
   </div>
 
   <!-- TABS -->
   <div class="flex gap-2 mb-3 flex-wrap">
-    <button onclick="cambiarTab('dashboard')" id="tab-dashboard" class="tab-active px-4 py-2 rounded-lg font-semibold text-sm">📊 Dashboard</button>
-    <button onclick="cambiarTab('mapa')" id="tab-mapa" class="bg-white px-4 py-2 rounded-lg font-semibold text-sm">🗺️ Mapa</button>
-    <button onclick="cambiarTab('ordenes')" id="tab-ordenes" class="bg-white px-4 py-2 rounded-lg font-semibold text-sm">📋 Órdenes</button>
-    <button onclick="cambiarTab('tecnicos')" id="tab-tecnicos" class="bg-white px-4 py-2 rounded-lg font-semibold text-sm">👷 Técnicos</button>
-    <button onclick="cambiarTab('asignacion')" id="tab-asignacion" class="bg-green-500 text-white px-4 py-2 rounded-lg font-semibold text-sm">⚡ Asignación Rápida</button>
+    <button onclick="cambiarTab('dashboard')" id="tab-dashboard" class="tab-active px-4 py-2 rounded-lg font-semibold text-sm transition">📊 Dashboard</button>
+    <button onclick="cambiarTab('mapa')" id="tab-mapa" class="tab-btn px-4 py-2 rounded-lg font-semibold text-sm transition">🗺️ Mapa</button>
+    <button onclick="cambiarTab('ordenes')" id="tab-ordenes" class="tab-btn px-4 py-2 rounded-lg font-semibold text-sm transition">📋 Órdenes</button>
+    <button onclick="cambiarTab('tecnicos')" id="tab-tecnicos" class="tab-btn px-4 py-2 rounded-lg font-semibold text-sm transition">👷 Técnicos</button>
+    <button onclick="cambiarTab('asignacion')" id="tab-asignacion" class="tab-accent px-4 py-2 rounded-lg font-semibold text-sm transition">⚡ Asignación Rápida</button>
   </div>
 
   <!-- CONTENIDO TABS -->
   <div id="contenido-dashboard" class="tab-content">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div class="bg-white rounded-lg shadow p-4">
-        <h3 class="font-bold text-slate-700 mb-3">📅 Órdenes por Tramo</h3>
+      <div class="panel p-4">
+        <h3 class="font-semibold mb-3" style="color: var(--ink);">📅 Órdenes por Tramo</h3>
         <div id="resumenTramos" class="space-y-2"></div>
       </div>
-      <div class="bg-white rounded-lg shadow p-4">
-        <h3 class="font-bold text-slate-700 mb-3">📦 Órdenes por Tipo</h3>
+      <div class="panel p-4">
+        <h3 class="font-semibold mb-3" style="color: var(--ink);">📦 Órdenes por Tipo</h3>
         <div id="resumenTipos" class="space-y-2"></div>
       </div>
-      <div class="bg-white rounded-lg shadow p-4">
-        <h3 class="font-bold text-slate-700 mb-3">📍 Top Distritos</h3>
+      <div class="panel p-4">
+        <h3 class="font-semibold mb-3" style="color: var(--ink);">📍 Top Distritos</h3>
         <div id="resumenDistritos" class="space-y-2"></div>
       </div>
     </div>
-    <div class="bg-white rounded-lg shadow p-4 mt-4">
-      <h3 class="font-bold text-red-600 mb-3">⚠️ Alertas y Acciones</h3>
+    <div class="panel p-4 mt-4">
+      <h3 class="font-semibold mb-3" style="color: var(--rose);">⚠️ Alertas y Acciones</h3>
       <div id="alertas" class="space-y-2"></div>
     </div>
   </div>
 
   <div id="contenido-mapa" class="tab-content hidden">
-    <div class="bg-white rounded-lg shadow p-4">
+    <div class="panel p-4">
       <div class="flex justify-between mb-3">
-        <h3 class="font-bold text-slate-700">🗺️ Mapa de Órdenes Activas (Esri Light Gray)</h3>
+        <h3 class="font-semibold" style="color: var(--ink);">🗺️ Mapa de Órdenes Activas (Esri Light Gray)</h3>
         <div class="flex gap-2 text-xs flex-wrap">
-          <span class="badge bg-blue-200 text-blue-800">● Programado</span>
-          <span class="badge bg-indigo-200 text-indigo-800">● Coordinado</span>
-          <span class="badge bg-purple-200 text-purple-800">● En Camino</span>
-          <span class="badge bg-cyan-200 text-cyan-800">● En Proceso</span>
+          <span class="badge" style="background: var(--primary-tint); color: var(--primary);">● Programado</span>
+          <span class="badge" style="background: var(--indigo-tint); color: var(--indigo);">● Coordinado</span>
+          <span class="badge" style="background: var(--violet-tint); color: var(--violet);">● En Camino</span>
+          <span class="badge" style="background: var(--teal-tint); color: var(--teal);">● En Proceso</span>
         </div>
       </div>
       <div id="map"></div>
-      <p class="text-xs text-slate-500 mt-2">ℹ️ Solo se muestran órdenes en estados activos: Programado, Coordinado, En Camino, En Proceso</p>
+      <p class="text-xs mt-2" style="color: var(--ink-soft);">ℹ️ Solo se muestran órdenes en estados activos: Programado, Coordinado, En Camino, En Proceso</p>
     </div>
   </div>
 
   <div id="contenido-ordenes" class="tab-content hidden">
-    <div class="bg-white rounded-lg shadow p-4">
-      <h3 class="font-bold text-slate-700 mb-3">📋 Listado de Órdenes</h3>
+    <div class="panel p-4">
+      <h3 class="font-semibold mb-3" style="color: var(--ink);">📋 Listado de Órdenes</h3>
       <div class="scroll-area">
         <table class="w-full text-xs">
-          <thead class="bg-slate-200 sticky top-0">
+          <thead style="background: var(--primary-tint); color: var(--primary-dark);" class="sticky top-0">
             <tr>
-              <th class="p-2 text-left">Código</th>
-              <th class="p-2 text-left">Cliente</th>
-              <th class="p-2 text-left">Distrito</th>
-              <th class="p-2 text-left">Tramo</th>
-              <th class="p-2 text-left">Tipo</th>
-              <th class="p-2 text-left">Estado</th>
-              <th class="p-2 text-left">Técnico</th>
-              <th class="p-2 text-left">Teléfono</th>
-              <th class="p-2 text-left">Acción</th>
+              <th class="p-2 text-left font-semibold">Código</th>
+              <th class="p-2 text-left font-semibold">Cliente</th>
+              <th class="p-2 text-left font-semibold">Distrito</th>
+              <th class="p-2 text-left font-semibold">Tramo</th>
+              <th class="p-2 text-left font-semibold">Tipo</th>
+              <th class="p-2 text-left font-semibold">Estado</th>
+              <th class="p-2 text-left font-semibold">Técnico</th>
+              <th class="p-2 text-left font-semibold">Teléfono</th>
+              <th class="p-2 text-left font-semibold">Acción</th>
             </tr>
           </thead>
           <tbody id="tablaOrdenes"></tbody>
@@ -209,9 +249,9 @@
   </div>
 
   <div id="contenido-tecnicos" class="tab-content hidden">
-    <div class="bg-white rounded-lg shadow p-4">
-      <h3 class="font-bold text-slate-700 mb-3">👷 Estado de Técnicos - Disponibilidad y Carga de Trabajo</h3>
-      <p class="text-sm text-slate-600 mb-3">
+    <div class="panel p-4">
+      <h3 class="font-semibold mb-3" style="color: var(--ink);">👷 Estado de Técnicos - Disponibilidad y Carga de Trabajo</h3>
+      <p class="text-sm mb-3" style="color: var(--ink-soft);">
         🟢 <b>LIBRE</b>: Sin órdenes Programado/Coordinado · 
         🟢 <b>PRÓXIMO A LIBRE</b>: 1 orden por atender · 
         🔴 <b>SATURADO</b>: 2+ órdenes en cualquier tramo (T1/T2/T3)
@@ -221,9 +261,9 @@
   </div>
 
   <div id="contenido-asignacion" class="tab-content hidden">
-    <div class="bg-white rounded-lg shadow p-4">
-      <h3 class="font-bold text-green-700 mb-3">⚡ Asignación Rápida - Órdenes Pendientes a Técnicos Libres</h3>
-      <p class="text-sm text-slate-600 mb-3">El sistema sugiere asignaciones basadas en: <b>Tramo (col. DR) + Distrito + Disponibilidad del técnico</b> <span class="text-xs text-slate-500">(Incluye: Pendiente, Programado, Coordinado)</span></p>
+    <div class="panel p-4">
+      <h3 class="font-semibold mb-3" style="color: var(--teal);">⚡ Asignación Rápida - Órdenes Pendientes a Técnicos Libres</h3>
+      <p class="text-sm mb-3" style="color: var(--ink-soft);">El sistema sugiere asignaciones basadas en: <b>Tramo (col. DR) + Distrito + Disponibilidad del técnico</b>, priorizando reingresos y evitando recomendar a un técnico más allá de su capacidad real por tramo. <span class="text-xs">(Incluye: Pendiente, Programado, Coordinado)</span></p>
       <div id="sugerencias" class="space-y-2"></div>
     </div>
   </div>
@@ -384,22 +424,30 @@ function renderKPIs() {
 
 function renderDashboard() {
   const tramos = ['08AM-12PM','12PM-04PM','04PM-08PM'];
-  const coloresTramo = {'08AM-12PM':'bg-yellow-100 text-yellow-800','12PM-04PM':'bg-blue-100 text-blue-800','04PM-08PM':'bg-pink-100 text-pink-800'};
+  const coloresTramo = {
+    '08AM-12PM':'background: var(--amber-tint); color: #7A5714;',
+    '12PM-04PM':'background: var(--primary-tint); color: var(--primary-dark);',
+    '04PM-08PM':'background: var(--rose-tint); color: #96324A;'
+  };
   document.getElementById('resumenTramos').innerHTML = tramos.map(t => {
     const total = datosFiltrados.filter(d => d.tramo === t).length;
     const fin = datosFiltrados.filter(d => d.tramo === t && d.estado === 'FINALIZADO').length;
     const pend = datosFiltrados.filter(d => d.tramo === t && ESTADOS_PENDIENTES.includes(d.estado)).length;
-    return `<div class="p-2 rounded ${coloresTramo[t]}">
+    return `<div class="p-2 rounded-lg" style="${coloresTramo[t]}">
       <div class="flex justify-between font-semibold"><span>${t}</span><span>${total} órdenes</span></div>
       <div class="text-xs mt-1">✅ ${fin} finalizadas · ⏳ ${pend} pendientes</div>
     </div>`;
   }).join('');
   
   const tipos = ['ALTA NUEVA','AVERÍAS','GARANTÍA'];
+  const coloresTipo = {
+    'ALTA NUEVA':'background: var(--green-tint); color: var(--green);',
+    'AVERÍAS':'background: var(--rose-tint); color: var(--rose);',
+    'GARANTÍA':'background: var(--amber-tint); color: var(--amber);'
+  };
   document.getElementById('resumenTipos').innerHTML = tipos.map(t => {
     const c = datosFiltrados.filter(d => d.tipo === t).length;
-    const colores = {'ALTA NUEVA':'bg-green-100 text-green-800','AVERÍAS':'bg-red-100 text-red-800','GARANTÍA':'bg-orange-100 text-orange-800'};
-    return `<div class="p-2 rounded ${colores[t]||'bg-slate-100'} flex justify-between"><span>${t}</span><span class="font-bold">${c}</span></div>`;
+    return `<div class="p-2 rounded-lg flex justify-between" style="${coloresTipo[t] || 'background: var(--canvas); color: var(--ink-soft);'}"><span>${t}</span><span class="font-bold">${c}</span></div>`;
   }).join('');
   
   const dists = {};
@@ -407,8 +455,8 @@ function renderDashboard() {
   const topDists = Object.entries(dists).sort((a,b) => b[1]-a[1]).slice(0,5);
   document.getElementById('resumenDistritos').innerHTML = topDists.map(([d,c]) => {
     const pct = datosFiltrados.length > 0 ? Math.round((c/datosFiltrados.length)*100) : 0;
-    return `<div class="flex justify-between text-sm"><span>${d}</span><span class="font-semibold">${c} (${pct}%)</span></div>`;
-  }).join('') || '<p class="text-sm text-slate-500">Sin datos</p>';
+    return `<div class="flex justify-between text-sm"><span style="color: var(--ink);">${d}</span><span class="font-semibold" style="color: var(--ink-soft);">${c} (${pct}%)</span></div>`;
+  }).join('') || '<p class="text-sm" style="color: var(--ink-soft);">Sin datos</p>';
   
   const reingresos = datosFiltrados.filter(d => d.reingreso > 0);
   const ausentes = datosFiltrados.filter(d => d.estado === 'AUSENTE');
@@ -416,49 +464,49 @@ function renderDashboard() {
   
   let alertasHTML = '';
   if (reingresos.length > 0) {
-    alertasHTML += `<div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
+    alertasHTML += `<div class="p-3 rounded-lg" style="background: var(--rose-tint); border-left: 3px solid var(--rose); color: #7A2439;">
       <b>🔴 ${reingresos.length} Reingresos detectados</b> - Priorizar atención
       <div class="text-xs mt-1">${reingresos.slice(0,3).map(r => `• ${r.codigo} - ${r.cliente} (${r.reingreso}x)`).join('<br>')}</div>
     </div>`;
   }
   if (ausentes.length > 0) {
-    alertasHTML += `<div class="bg-orange-50 border-l-4 border-orange-500 p-3 rounded">
+    alertasHTML += `<div class="p-3 rounded-lg" style="background: #FBEADD; border-left: 3px solid #C4701F; color: #8A4A14;">
       <b>🟠 ${ausentes.length} Clientes AUSENTES</b> - Reprogramar o cancelar
     </div>`;
   }
   if (sinCoord.length > 0) {
-    alertasHTML += `<div class="bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded">
+    alertasHTML += `<div class="p-3 rounded-lg" style="background: var(--amber-tint); border-left: 3px solid var(--amber); color: #7A5714;">
       <b>🟡 ${sinCoord.length} Pendientes sin coordinar</b> - Llamar antes de asignar
     </div>`;
   }
-  if (!alertasHTML) alertasHTML = '<p class="text-green-600">✅ Sin alertas críticas</p>';
+  if (!alertasHTML) alertasHTML = '<p style="color: var(--green);">✅ Sin alertas críticas</p>';
   document.getElementById('alertas').innerHTML = alertasHTML;
 }
 
 function renderOrdenes() {
   const tbody = document.getElementById('tablaOrdenes');
   const estadoColor = {
-    'PENDIENTE':'bg-yellow-100 text-yellow-800',
-    'PROGRAMADO':'bg-blue-100 text-blue-800',
-    'COORDINADO':'bg-indigo-100 text-indigo-800',
-    'EN CAMINO':'bg-purple-100 text-purple-800',
-    'EN PROCESO':'bg-cyan-100 text-cyan-800',
-    'FINALIZADO':'bg-green-100 text-green-800',
-    'AUSENTE':'bg-red-100 text-red-800',
-    'REPROGRAMA':'bg-orange-100 text-orange-800',
-    'CANCELADO':'bg-slate-200 text-slate-700'
+    'PENDIENTE':'background: var(--amber-tint); color: #7A5714;',
+    'PROGRAMADO':'background: var(--primary-tint); color: var(--primary-dark);',
+    'COORDINADO':'background: var(--indigo-tint); color: var(--indigo);',
+    'EN CAMINO':'background: var(--violet-tint); color: var(--violet);',
+    'EN PROCESO':'background: var(--teal-tint); color: var(--teal);',
+    'FINALIZADO':'background: var(--green-tint); color: var(--green);',
+    'AUSENTE':'background: var(--rose-tint); color: var(--rose);',
+    'REPROGRAMA':'background: #FBEADD; color: #B15A1E;',
+    'CANCELADO':'background: #EEF1F5; color: var(--ink-soft);'
   };
   tbody.innerHTML = datosFiltrados.slice(0,200).map(d => `
-    <tr class="border-b hover:bg-slate-50">
-      <td class="p-2 font-mono">${d.codigo}</td>
-      <td class="p-2">${d.cliente}<br><span class="text-slate-500 text-[10px]">${d.dni}</span></td>
-      <td class="p-2">${d.distrito}</td>
-      <td class="p-2 text-xs">${d.tramo}</td>
-      <td class="p-2 text-xs">${d.tipo}</td>
-      <td class="p-2"><span class="badge ${estadoColor[d.estado]||'bg-slate-100'}">${d.estado}</span></td>
-      <td class="p-2 text-xs">${d.tecnico||'<i class="text-slate-400">Sin asignar</i>'}</td>
-      <td class="p-2 text-xs">${d.telefono}</td>
-      <td class="p-2"><button onclick="verDetalle('${d.codigo}')" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">Ver</button></td>
+    <tr class="border-b hover:bg-slate-50" style="border-color: var(--line);">
+      <td class="p-2 font-mono" style="color: var(--ink);">${d.codigo}</td>
+      <td class="p-2" style="color: var(--ink);">${d.cliente}<br><span class="text-[10px]" style="color: var(--ink-soft);">${d.dni}</span></td>
+      <td class="p-2" style="color: var(--ink);">${d.distrito}</td>
+      <td class="p-2 text-xs" style="color: var(--ink);">${d.tramo}</td>
+      <td class="p-2 text-xs" style="color: var(--ink);">${d.tipo}</td>
+      <td class="p-2"><span class="badge" style="${estadoColor[d.estado]||'background: #EEF1F5; color: var(--ink-soft);'}">${d.estado}</span></td>
+      <td class="p-2 text-xs" style="color: var(--ink);">${d.tecnico||'<i style="color:#9AA6B5;">Sin asignar</i>'}</td>
+      <td class="p-2 text-xs" style="color: var(--ink);">${d.telefono}</td>
+      <td class="p-2"><button onclick="verDetalle('${d.codigo}')" style="background: var(--primary);" class="text-white px-2 py-1 rounded text-xs hover:opacity-90">Ver</button></td>
     </tr>
   `).join('');
 }
@@ -547,43 +595,43 @@ function renderTecnicos() {
       mensajeEstado = `${cargaPendiente} orden(es) por atender`;
     }
     
-    // ✅ Color rojo para tramos saturados (>=2)
-    const t1Class = t.T1 >= 2 ? 'bg-red-100 border-red-500' : 'tramo-t1';
-    const t2Class = t.T2 >= 2 ? 'bg-red-100 border-red-500' : 'tramo-t2';
-    const t3Class = t.T3 >= 2 ? 'bg-red-100 border-red-500' : 'tramo-t3';
+    // ✅ Tramo saturado (>=2) se resalta en tono rosa de la paleta pro
+    const t1Class = t.T1 >= 2 ? 'tramo-saturado' : 'tramo-t1';
+    const t2Class = t.T2 >= 2 ? 'tramo-saturado' : 'tramo-t2';
+    const t3Class = t.T3 >= 2 ? 'tramo-saturado' : 'tramo-t3';
     
-    return `<div class="card ${estadoClase} rounded-lg p-4 shadow">
+    return `<div class="card ${estadoClase} rounded-lg p-4">
       <div class="flex justify-between items-start mb-3">
         <div>
-          <div class="font-bold text-base">${nom}</div>
-          <div class="text-sm text-slate-600 info-line">📱 ${t.cel||'N/A'}</div>
-          <div class="text-sm text-slate-500 info-line">📍 ${distritoPrincipal}</div>
+          <div class="font-bold text-base" style="color: var(--ink);">${nom}</div>
+          <div class="text-sm info-line" style="color: var(--ink-soft);">📱 ${t.cel||'N/A'}</div>
+          <div class="text-sm info-line" style="color: var(--ink-soft);">📍 ${distritoPrincipal}</div>
         </div>
         <div class="text-right">
-          <div class="estado-texto font-bold">${estadoTexto}</div>
+          <div class="estado-texto font-bold" style="color: var(--ink);">${estadoTexto}</div>
           <div class="estado-icono">${estadoIcono}</div>
         </div>
       </div>
       
-      <div class="bg-white rounded p-3 mb-3">
-        <div class="text-sm font-semibold text-slate-700 mb-1 info-line">📋 Trabajo Pendiente (Prog. + Coord.): <span class="carga-numero text-blue-700">${cargaPendiente}</span></div>
-        <div class="text-xs text-slate-500 mb-2 sub-label">${mensajeEstado}</div>
+      <div class="rounded p-3 mb-3" style="background: var(--surface); border: 1px solid var(--line);">
+        <div class="text-sm font-semibold mb-1 info-line" style="color: var(--ink);">📋 Trabajo Pendiente (Prog. + Coord.): <span class="carga-numero" style="color: var(--primary);">${cargaPendiente}</span></div>
+        <div class="text-xs mb-2 sub-label" style="color: var(--ink-soft);">${mensajeEstado}</div>
         <div class="grid grid-cols-4 gap-1 text-center">
-          <div class="estado-orden bg-purple-50 rounded">
-            <div class="font-bold text-purple-700">${t.enCamino}</div>
-            <div class="text-[10px]">En Camino</div>
+          <div class="estado-orden rounded" style="background: var(--violet-tint);">
+            <div class="font-bold" style="color: var(--violet);">${t.enCamino}</div>
+            <div class="text-[10px]" style="color: var(--ink-soft);">En Camino</div>
           </div>
-          <div class="estado-orden bg-cyan-50 rounded">
-            <div class="font-bold text-cyan-700">${t.enProceso}</div>
-            <div class="text-[10px]">En Proceso</div>
+          <div class="estado-orden rounded" style="background: var(--teal-tint);">
+            <div class="font-bold" style="color: var(--teal);">${t.enProceso}</div>
+            <div class="text-[10px]" style="color: var(--ink-soft);">En Proceso</div>
           </div>
-          <div class="estado-orden bg-blue-50 rounded">
-            <div class="font-bold text-blue-700">${t.programado}</div>
-            <div class="text-[10px]">Programado</div>
+          <div class="estado-orden rounded" style="background: var(--primary-tint);">
+            <div class="font-bold" style="color: var(--primary);">${t.programado}</div>
+            <div class="text-[10px]" style="color: var(--ink-soft);">Programado</div>
           </div>
-          <div class="estado-orden bg-indigo-50 rounded">
-            <div class="font-bold text-indigo-700">${t.coordinado}</div>
-            <div class="text-[10px]">Coordinado</div>
+          <div class="estado-orden rounded" style="background: var(--indigo-tint);">
+            <div class="font-bold" style="color: var(--indigo);">${t.coordinado}</div>
+            <div class="text-[10px]" style="color: var(--ink-soft);">Coordinado</div>
           </div>
         </div>
       </div>
@@ -594,88 +642,119 @@ function renderTecnicos() {
         <div class="${t3Class} rounded tramo-box"><div class="font-bold">${t.T3}</div><div class="text-[11px]">T3 (16-20)</div></div>
       </div>
       
-      <div class="flex justify-between text-sm info-line">
+      <div class="flex justify-between text-sm info-line" style="color: var(--ink-soft);">
         <span>✅ ${t.finalizadas} finalizadas</span>
-        <span class="font-bold text-purple-600">📊 ${ef}% efectividad</span>
+        <span class="font-bold" style="color: var(--teal);">📊 ${ef}% efectividad</span>
       </div>
     </div>`;
   }).join('');
 }
 
 function renderSugerencias() {
-  const pendientes = datosFiltrados.filter(d => ESTADOS_PENDIENTES.includes(d.estado) && d.latitud && d.longitud);
+  const CAP_TRAMO = 2; // mismo umbral usado para marcar a un técnico como SATURADO en la pestaña Técnicos
+  const tramoKey = { '08AM-12PM':'T1', '12PM-04PM':'T2', '04PM-08PM':'T3' };
+
+  // 1) Carga real actual de cada técnico (solo Programado/Coordinado cuentan como trabajo pendiente)
   const tecnicos = {};
   datos.forEach(d => {
     if (!d.tecnico) return;
     if (!tecnicos[d.tecnico]) {
-      tecnicos[d.tecnico] = {
-        T1:0, T2:0, T3:0,
-        totalTrabajoPendiente:0,
-        cel:d.celTecnico,
-        distritos:{}
-      };
+      tecnicos[d.tecnico] = { T1:0, T2:0, T3:0, totalTrabajoPendiente:0, cel:d.celTecnico, distritos:{} };
     }
     const t = tecnicos[d.tecnico];
-    // ✅ Solo contar PROGRAMADO + COORDINADO para T1/T2/T3
     if (ESTADOS_TRABAJO_PENDIENTE.includes(d.estado)) {
       if (d.tramo === '08AM-12PM') t.T1++;
       if (d.tramo === '12PM-04PM') t.T2++;
       if (d.tramo === '04PM-08PM') t.T3++;
+      t.totalTrabajoPendiente++;
     }
-    if (ESTADOS_TRABAJO_PENDIENTE.includes(d.estado)) t.totalTrabajoPendiente++;
-    t.distritos[d.distrito] = (t.distritos[d.distrito]||0) + 1;
+    if (d.distrito) t.distritos[d.distrito] = (t.distritos[d.distrito]||0) + 1;
   });
-  
+
+  // 2) Órdenes a asignar, priorizadas: reingresos primero, luego por tramo (T1 antes que T2 antes que T3)
+  const ordenTramoPrioridad = { '08AM-12PM':0, '12PM-04PM':1, '04PM-08PM':2 };
+  const pendientes = datosFiltrados
+    .filter(d => ESTADOS_PENDIENTES.includes(d.estado) && d.latitud && d.longitud)
+    .slice()
+    .sort((a,b) => {
+      const rein = (b.reingreso>0?1:0) - (a.reingreso>0?1:0);
+      if (rein !== 0) return rein;
+      return (ordenTramoPrioridad[a.tramo] ?? 9) - (ordenTramoPrioridad[b.tramo] ?? 9);
+    });
+
+  // 3) Asignación golosa que SIMULA la carga a medida que va sugiriendo, para no
+  //    recomendar al mismo técnico más órdenes de las que puede tomar en un tramo,
+  //    y que evalúa la capacidad SOLO del tramo de esa orden (no bloquea al técnico
+  //    en T1 por estar saturado en T2, por ejemplo).
   const sugerencias = [];
+  const sinCandidato = [];
+
   pendientes.forEach(p => {
+    const key = tramoKey[p.tramo];
     const candidatos = Object.entries(tecnicos)
-      .filter(([nom,t]) => {
-        // ✅ No sugerir técnicos saturados (T1, T2 o T3 >= 2)
-        return t.T1 < 2 && t.T2 < 2 && t.T3 < 2;
-      })
+      .filter(([nom,t]) => key ? t[key] < CAP_TRAMO : (t.T1 < CAP_TRAMO && t.T2 < CAP_TRAMO && t.T3 < CAP_TRAMO))
       .map(([nom,t]) => {
+        const enDistrito = t.distritos[p.distrito] || 0;
+        const motivos = [];
         let score = 0;
-        if (t.distritos[p.distrito]) score += 10;
-        if (p.tramo === '08AM-12PM' && t.T1 < 1) score += 5;
-        if (p.tramo === '12PM-04PM' && t.T2 < 1) score += 5;
-        if (p.tramo === '04PM-08PM' && t.T3 < 1) score += 5;
-        score -= t.totalTrabajoPendiente;
-        return {nom, score, cel:t.cel, carga:t.totalTrabajoPendiente, T1:t.T1, T2:t.T2, T3:t.T3};
+        if (enDistrito > 0) { score += 10 + Math.min(enDistrito,5)*2; motivos.push(`conoce ${p.distrito} (${enDistrito} ord.)`); }
+        if (key && t[key] === 0) { score += 6; motivos.push('tramo libre'); }
+        else if (key && t[key] === 1) { score += 2; motivos.push('tramo con 1 orden'); }
+        score -= t.totalTrabajoPendiente * 1.5;
+        if (p.reingreso > 0) motivos.push('reingreso prioritario');
+        return { nom, score, cel:t.cel, carga:t.totalTrabajoPendiente, motivos };
       })
-      .sort((a,b) => b.score - a.score);
-    
+      .sort((a,b) => b.score - a.score || a.carga - b.carga);
+
     if (candidatos[0]) {
+      const elegido = candidatos[0];
       sugerencias.push({
         orden: p,
-        tecnico: candidatos[0].nom,
-        score: candidatos[0].score,
-        cel: candidatos[0].cel,
-        cargaActual: candidatos[0].carga,
-        T1: candidatos[0].T1,
-        T2: candidatos[0].T2,
-        T3: candidatos[0].T3
+        tecnico: elegido.nom,
+        score: Math.round(elegido.score * 10) / 10,
+        cel: elegido.cel,
+        cargaActual: elegido.carga,
+        motivo: elegido.motivos.join(' · ') || 'menor carga disponible'
       });
+      // Reservar el cupo simulado para que la siguiente orden en la lista no
+      // sobrecargue al mismo técnico más allá de su capacidad real.
+      const t = tecnicos[elegido.nom];
+      if (key) t[key]++;
+      t.totalTrabajoPendiente++;
+    } else {
+      sinCandidato.push(p);
     }
   });
   
   const cont = document.getElementById('sugerencias');
-  if (sugerencias.length === 0) {
-    cont.innerHTML = '<p class="text-slate-500">No hay sugerencias. Carga un Excel con órdenes pendientes.</p>';
+  if (sugerencias.length === 0 && sinCandidato.length === 0) {
+    cont.innerHTML = '<p style="color: var(--ink-soft);">No hay sugerencias. Carga un Excel con órdenes pendientes.</p>';
     return;
   }
-  cont.innerHTML = sugerencias.slice(0,15).map(s => `
-    <div class="border rounded p-2 flex justify-between items-center hover:bg-green-50">
+
+  let html = sugerencias.slice(0,15).map(s => `
+    <div class="rounded-lg p-2 flex justify-between items-center transition" style="border: 1px solid var(--line);" onmouseover="this.style.background='var(--teal-tint)'" onmouseout="this.style.background='transparent'">
       <div class="flex-1">
-        <div class="font-semibold text-sm">📦 ${s.orden.codigo} - ${s.orden.cliente}</div>
-        <div class="text-xs text-slate-600">📍 ${s.orden.distrito} · 🕐 ${s.orden.tramo} · 📱 ${s.orden.telefono} · <span class="badge bg-blue-100 text-blue-800">${s.orden.estado}</span></div>
+        <div class="font-semibold text-sm" style="color: var(--ink);">📦 ${s.orden.codigo} - ${s.orden.cliente}</div>
+        <div class="text-xs" style="color: var(--ink-soft);">📍 ${s.orden.distrito} · 🕐 ${s.orden.tramo} · 📱 ${s.orden.telefono} · <span class="badge" style="background: var(--primary-tint); color: var(--primary);">${s.orden.estado}</span></div>
+        <div class="text-[11px] mt-0.5" style="color: var(--teal);">💡 ${s.motivo}</div>
       </div>
       <div class="text-right">
-        <div class="text-xs text-green-700 font-semibold">➡️ Asignar a:</div>
-        <div class="text-sm font-bold text-blue-700">${s.tecnico}</div>
-        <div class="text-xs text-slate-500">Score: ${s.score} · Carga: ${s.cargaActual} · 📱 ${s.cel}</div>
+        <div class="text-xs font-semibold" style="color: var(--teal);">➡️ Asignar a:</div>
+        <div class="text-sm font-bold" style="color: var(--primary);">${s.tecnico}</div>
+        <div class="text-xs" style="color: var(--ink-soft);">Score: ${s.score} · Carga: ${s.cargaActual} · 📱 ${s.cel}</div>
       </div>
     </div>
   `).join('');
+
+  if (sinCandidato.length > 0) {
+    html += `<div class="rounded-lg p-3 mt-2" style="background: var(--rose-tint); border-left: 3px solid var(--rose); color: #7A2439;">
+      <b>⚠️ ${sinCandidato.length} orden(es) sin técnico disponible</b> - todos los técnicos están saturados en el tramo correspondiente
+      <div class="text-xs mt-1">${sinCandidato.slice(0,8).map(p => `• ${p.codigo} - ${p.cliente} (${p.distrito} · ${p.tramo})`).join('<br>')}${sinCandidato.length>8 ? `<br>… y ${sinCandidato.length-8} más` : ''}</div>
+    </div>`;
+  }
+
+  cont.innerHTML = html;
 }
 
 function renderMapa() {
@@ -695,10 +774,10 @@ function renderMapa() {
   markers = [];
   
   const colorEstado = {
-    'PROGRAMADO':'#3b82f6',
-    'COORDINADO':'#6366f1',
-    'EN CAMINO':'#8b5cf6',
-    'EN PROCESO':'#06b6d4'
+    'PROGRAMADO':'#1E4B8F',
+    'COORDINADO':'#4A47A3',
+    'EN CAMINO':'#7C4FA0',
+    'EN PROCESO':'#0E8F86'
   };
   
   const ordenesMapa = datosFiltrados.filter(d => ESTADOS_MAPA.includes(d.estado));
@@ -711,7 +790,7 @@ function renderMapa() {
     }).addTo(map);
     marker.bindPopup(`
       <div style="min-width:220px">
-        <b style="color:#1e40af">${d.codigo}</b><br>
+        <b style="color:#153663">${d.codigo}</b><br>
         👤 ${d.cliente}<br>
         📍 ${d.direccion}<br>
         🏘️ ${d.distrito}<br>
@@ -734,13 +813,14 @@ function renderMapa() {
 function cambiarTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('[id^="tab-"]').forEach(el => {
-    el.classList.remove('tab-active','bg-green-500','text-white');
-    el.classList.add('bg-white');
+    el.classList.remove('tab-active','tab-accent');
+    el.classList.add('tab-btn');
   });
   document.getElementById('contenido-' + tab).classList.remove('hidden');
   const btn = document.getElementById('tab-' + tab);
+  btn.classList.remove('tab-btn');
   if (tab === 'asignacion') {
-    btn.classList.add('bg-green-500','text-white');
+    btn.classList.add('tab-accent');
   } else {
     btn.classList.add('tab-active');
   }
