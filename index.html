@@ -172,6 +172,8 @@
         <option value="ALTA NUEVA">Alta Nueva</option>
         <option value="AVERÍAS">Avería</option>
         <option value="GARANTÍA">Garantía</option>
+        <option value="REITERATIVO">Reiterativo</option>
+        <option value="POSTVENTA">Postventa</option>
       </select>
       <input type="text" id="filtroBusqueda" onkeyup="aplicarFiltros()" placeholder="🔍 Buscar cliente/DNI..." class="input-field rounded-lg px-2 py-1.5 text-sm">
     </div>
@@ -314,14 +316,33 @@ function procesarExcel(wb) {
   
   const headers = jsonData[0].map(h => (h||'').toString().trim());
   const idxDR = 121;
+  const idxDG = 110; // columna DG = NEGOCIO (tipo: ALTA NUEVA / AVERÍAS / GARANTÍA / REITERATIVO / POSTVENTA)
   
   console.log('Headers encontrados:', headers.length);
-  console.log('Columna DR (índice 121):', headers[idxDR]);
+  console.log('Columna DR (índice 121, Tramo):', headers[idxDR]);
+  console.log('Columna DG (índice 110, Negocio):', headers[idxDG]);
   
   const colMap = {};
   headers.forEach((h, i) => { if(h) colMap[h] = i; });
+  // Mapa normalizado (mayúsculas, sin tildes) como respaldo por si el encabezado
+  // real viene con distinta capitalización/tildes que las variantes ya contempladas.
+  const quitarTildes = s => s.toString().toUpperCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const colMapNorm = {};
+  headers.forEach((h, i) => { if(h) colMapNorm[quitarTildes(h)] = i; });
+  const buscarCol = (...nombres) => {
+    for (const n of nombres) {
+      if (colMap[n] !== undefined) return colMap[n];
+      const norm = colMapNorm[quitarTildes(n)];
+      if (norm !== undefined) return norm;
+    }
+    return undefined;
+  };
   
   const rows = jsonData.slice(1).filter(r => r && r.length > 0 && r[0]);
+  // El Negocio (tipo) se lee por posición fija (columna DG), igual que el Tramo por DR,
+  // porque el encabezado puede no llamarse exactamente "tipo"/"Tipo_alta". Si por algún
+  // motivo esa columna viniera vacía, cae de respaldo a la búsqueda por nombre de columna.
+  const idxTipoFallback = buscarCol('tipo', 'Tipo_alta', 'Tipo', 'Negocio', 'tipo_orden', 'Tipo_orden', 'tipo_servicio', 'Tipo_servicio', 'Tipo_de_orden');
   
   datos = rows.map(row => {
     let tramoValor = row[idxDR] || '';
@@ -337,7 +358,7 @@ function procesarExcel(wb) {
       longitud: parseFloat(row[colMap['longitud']]) || 0,
       tramo: normalizarTramo(tramoValor),
       tramoOriginal: tramoValor.toString(),
-      tipo: row[colMap['tipo']] || row[colMap['Tipo_alta']] || '',
+      tipo: normalizarTipo(row[idxDG] || (idxTipoFallback !== undefined ? row[idxTipoFallback] : '')),
       estado: (row[colMap['Estado']] || row[colMap['Estado_1']] || '').toString().toUpperCase().trim(),
       tecnico: row[colMap['Tecnico']] || '',
       celTecnico: row[colMap['Cel_Tecnico']] || '',
@@ -355,7 +376,7 @@ function procesarExcel(wb) {
   datosFiltrados = [...datos];
   poblarFiltros();
   renderizarTodo();
-  alert(`✅ Se cargaron ${datos.length} órdenes correctamente\n📌 Tramos leídos desde columna DR`);
+  alert(`✅ Se cargaron ${datos.length} órdenes correctamente\n📌 Tramos leídos desde columna DR\n📌 Negocio (Tipo) leído desde columna DG`);
 }
 
 function normalizarTramo(t) {
@@ -365,6 +386,20 @@ function normalizarTramo(t) {
   if (t.match(/12.*16/) || t.match(/12PM.*04PM/) || t.match(/12.*4PM/) || t.includes('12PM-04PM')) return '12PM-04PM';
   if (t.match(/16.*20/) || t.match(/04PM.*08PM/) || t.match(/4PM.*8PM/) || t.includes('04PM-08PM') || t.includes('16PM-20PM')) return '04PM-08PM';
   return t;
+}
+
+function normalizarTipo(t) {
+  if (!t) return '';
+  // Compara sin tildes/mayúsculas para tolerar variaciones del Excel (Alta Nueva,
+  // AVERIA sin tilde, GARANTIA sin tilde, espacios extra, etc.) y siempre devuelve
+  // uno de los 3 valores canónicos que usan el filtro y el dashboard.
+  const s = t.toString().toUpperCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (s.includes('ALTA')) return 'ALTA NUEVA';
+  if (s.includes('AVER')) return 'AVERÍAS';
+  if (s.includes('GARANT')) return 'GARANTÍA';
+  if (s.includes('REITER')) return 'REITERATIVO';
+  if (s.includes('POST') && s.includes('VENTA')) return 'POSTVENTA';
+  return t.toString().toUpperCase().trim();
 }
 
 function poblarFiltros() {
@@ -439,11 +474,13 @@ function renderDashboard() {
     </div>`;
   }).join('');
   
-  const tipos = ['ALTA NUEVA','AVERÍAS','GARANTÍA'];
+  const tipos = ['ALTA NUEVA','AVERÍAS','GARANTÍA','REITERATIVO','POSTVENTA'];
   const coloresTipo = {
     'ALTA NUEVA':'background: var(--green-tint); color: var(--green);',
     'AVERÍAS':'background: var(--rose-tint); color: var(--rose);',
-    'GARANTÍA':'background: var(--amber-tint); color: var(--amber);'
+    'GARANTÍA':'background: var(--amber-tint); color: var(--amber);',
+    'REITERATIVO':'background: var(--violet-tint); color: var(--violet);',
+    'POSTVENTA':'background: var(--indigo-tint); color: var(--indigo);'
   };
   document.getElementById('resumenTipos').innerHTML = tipos.map(t => {
     const c = datosFiltrados.filter(d => d.tipo === t).length;
